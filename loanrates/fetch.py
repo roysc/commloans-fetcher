@@ -7,7 +7,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from datetime import datetime, timedelta
 
-import county_codes
+import loanrates.county_codes
 
 def debug(*a):
   print(file=sys.stderr, *a)
