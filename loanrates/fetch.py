@@ -1,4 +1,5 @@
-import os, sys
+import os, sys, re
+import uuid
 from selenium import webdriver
 from selenium.webdriver.support.ui import Select
 import selenium.common.exceptions as sexc
@@ -7,24 +8,27 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from datetime import datetime, timedelta
 
-import loanrates.county_codes
+from loanrates import county_codes
 
 def debug(*a):
   print(file=sys.stderr, *a)
 
 acr_url = 'https://apps.fsa.usda.gov/acr/'
-download_root = './'
+# download_root = './'
 
 class Fetcher:
     
-  def __init__(self, dlpath):
-    self._dr = Fetcher._driver(dlpath)
-    self.set_wait(10)
+  def __init__(self, download_root):
+    linkname = str(uuid.uuid4())
+    self.download_root = download_root
+    self._dltarget = os.path.join(download_root, linkname)
+    self._dr = Fetcher._make_driver(self._dltarget)
+    self.set_wait(1.5)
     
   def set_wait(self, n):
     self._wait = WebDriverWait(self._dr, n)
 
-  def _driver(dlpath):
+  def _make_driver(dlto):
     # profile = webdriver.FirefoxProfile()
     # profile.set_preference('browser.download.folderList', 2)
     # profile.set_preference('browser.download.manager.showWhenStarting', False)
@@ -33,14 +37,17 @@ class Fetcher:
     # profile.update_preferences()
     # return webdriver.Firefox(profile)
     options = webdriver.ChromeOptions()
-    prefs = {'download.default_directory': dlpath}
+    prefs = {'download.default_directory': dlto}
     options.add_experimental_option('prefs', prefs)
     return webdriver.Chrome(chrome_options=options)
 
   def set_dlpath(self, path):
     # self._dr.profile.set_preference('browser.download.dir', path)
     # self._dr.profile.update_preferences()
-    pass
+    # Hack: download dir is symlink, just change its target
+    if os.path.exists(self._dltarget):
+      os.remove(self._dltarget)
+    os.symlink(path, self._dltarget, target_is_directory=True)
     
   # Returns true if page was refreshed
   def _wait_for_counties(self, elt_county):
@@ -55,12 +62,12 @@ class Fetcher:
     self._wait.until(EC.presence_of_element_located((By.ID, 'county')))
     return reloaded
     
-  def _get_homepage(self):
+  def get_homepage(self):
     self._dr.get(acr_url)
     self._wait.until(EC.title_contains('Archived'))
     
   def get_states_counties(self):
-    self._get_homepage()
+    self.get_homepage()
     # present = EC.presence_of_element_located(By.ID, 'county')
 
     elt_state = self._dr.find_element_by_id('state')
@@ -87,7 +94,7 @@ class Fetcher:
   def request_data(self, state, county, year):
     debug('request_data:', county_codes.state_names[state], county, year)
     
-    self._get_homepage()
+    self.get_homepage()
     
     elt_state = self._dr.find_element_by_id('state')
     elt_county = self._dr.find_element_by_id('county')
@@ -120,16 +127,31 @@ class Fetcher:
     Select(elt_commodity).select_by_visible_text('CORN')
 
     self._dr.execute_script('submitRequest("displayReport")')
-
+    
     # Get CSV file
-    # dlpath = os.path.join(download_root, str(state), str(county))
-    # os.makedirs(dlpath, exist_ok=True)
-    # self.set_dlpath(dlpath)
+    dlpath = os.path.join(self.download_root, str(state), str(county))
+    os.makedirs(dlpath, exist_ok=True)
+    self.set_dlpath(dlpath)
     
     xpath_getcsv = '//*[@title="Comma-Separated Values"]'
-    self._wait.until(EC.presence_of_element_located((By.XPATH, xpath_getcsv)))
-    self._dr.execute_script('submitRequest("exportToCSV")')
 
+    try:
+      self._wait.until(EC.presence_of_element_located((By.XPATH, xpath_getcsv)))
+
+    # Timed out. Maybe no results?
+    except sexc.TimeoutException as e:
+      try:
+        elt_feedback = self._dr.find_element_by_xpath('//*[@id="report-feedback"]/p')
+        if re.search('No results found', elt_feedback.text):
+          debug(' ...no results')
+          return False
+      except sexc.NoSuchElementException:
+        raise e
+  
+    self._dr.execute_script('submitRequest("exportToCSV")')
+    
+    return True
+    
   def request_all_counties(self, state, c=None):
     name = county_codes.state_names[state]
     if c is None:
@@ -137,19 +159,26 @@ class Fetcher:
     elif isinstance(c, str):
       counties = [cty for cty in county_codes.counties[name]
                   if c <= cty]
-    debug("counties:", counties)
+    # debug("counties:", counties)
+    res = []
     for county in counties:
-      self.request_all_years(state, county)
-
+      r = self.request_all_years(state, county)
+      res.extend(r)
+    return res
+  
   def request_all_years(self, state, county):
+    res = []
     for year in range(2004, 2009):
       attempts = 5
       while attempts > 0:
         try:
-          self.request_data(state, county, year)
+          if self.request_data(state, county, year):
+            res.append((state, county, year))
           break
         except sexc.TimeoutException as e:
+          debug("timed out:", state, county, "attempts:", attempts)
           attempts -= 1
-          # if not attempts:
-          #   debug("max attempts made:", state, county)
+          if not attempts:
+            debug("max attempts made:", state, county)
           #   raise e
+    return res
