@@ -19,8 +19,8 @@ acr_url = 'https://apps.fsa.usda.gov/acr/'
 class Fetcher:
     
   def __init__(self, download_root):
-    linkname = str(uuid.uuid4())
     self.download_root = download_root
+    linkname = str(uuid.uuid4())
     self._dltarget = os.path.join(download_root, linkname)
     self._dr = Fetcher._make_driver(self._dltarget)
     self.set_wait(1.5)
@@ -34,6 +34,7 @@ class Fetcher:
     # profile.set_preference('browser.download.manager.showWhenStarting', False)
     # profile.set_preference('browser.helperApps.neverAsk.saveToDisk', 'text/csv')
     # profile.set_preference('browser.helperApps.neverAsk.openFile', 'text/csv')
+    # profile.set_preference('browser.download.dir', dlto)
     # profile.update_preferences()
     # return webdriver.Firefox(profile)
     options = webdriver.ChromeOptions()
@@ -42,8 +43,6 @@ class Fetcher:
     return webdriver.Chrome(chrome_options=options)
 
   def set_dlpath(self, path):
-    # self._dr.profile.set_preference('browser.download.dir', path)
-    # self._dr.profile.update_preferences()
     # Hack: download dir is symlink, just change its target
     if os.path.exists(self._dltarget):
       os.remove(self._dltarget)
@@ -126,6 +125,9 @@ class Fetcher:
     elt_commodity = self._dr.find_element_by_id('commodity')
     Select(elt_commodity).select_by_visible_text('CORN')
 
+    # xpath_run = '//*[@title="Run Report"]'
+    # btn_run = self._dr.find_element_by_xpath(xpath_run)
+    # btn_run.click()
     self._dr.execute_script('submitRequest("displayReport")')
     
     # Get CSV file
@@ -134,7 +136,6 @@ class Fetcher:
     self.set_dlpath(dlpath)
     
     xpath_getcsv = '//*[@title="Comma-Separated Values"]'
-
     try:
       self._wait.until(EC.presence_of_element_located((By.XPATH, xpath_getcsv)))
 
@@ -151,22 +152,8 @@ class Fetcher:
     self._dr.execute_script('submitRequest("exportToCSV")')
     
     return True
-    
-  def request_all_counties(self, state, c=None):
-    name = county_codes.state_names[state]
-    if c is None:
-      counties = county_codes.counties[name]
-    elif isinstance(c, str):
-      counties = [cty for cty in county_codes.counties[name]
-                  if c <= cty]
-    # debug("counties:", counties)
-    res = []
-    for county in counties:
-      r = self.request_all_years(state, county)
-      res.extend(r)
-    return res
   
-  def request_all_years(self, state, county):
+  def request_all_years(self, state, county, cont=True):
     res = []
     for year in range(2004, 2009):
       attempts = 5
@@ -175,10 +162,26 @@ class Fetcher:
           if self.request_data(state, county, year):
             res.append((state, county, year))
           break
-        except sexc.TimeoutException as e:
-          debug("timed out:", state, county, "attempts:", attempts)
+        except sexc.WebDriverException as e:
+          if cont:
+            debug(" error:", e)
+          else: raise e
+          debug(" attempts:", attempts)
           attempts -= 1
           if not attempts:
-            debug("max attempts made:", state, county)
+            debug(" max attempts made", state, county)
           #   raise e
+    return res
+    
+  def request_all_counties(self, state, counties=None, from_=None):
+    name = county_codes.state_names[state]
+    if counties is None:
+      counties = county_codes.counties[name]
+    if from_ is not None:
+      counties = [cty for cty in counties if from_ <= cty]
+    # debug("counties:", counties)
+    res = []
+    for county in counties:
+      r = self.request_all_years(state, county)
+      res.extend(r)
     return res
