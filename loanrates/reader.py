@@ -70,6 +70,10 @@ class Reader:
       assert not d.isnull().any().any(), d
       dfs.append(d)
 
+    # Deal with empty directory
+    if not dfs:
+      return pd.DataFrame()
+    
     ret = pd.concat(dfs)
     # Drop duplicates
     ret = ret.groupby(level=0).first()
@@ -80,6 +84,7 @@ class Reader:
     path = os.path.join(self.root, state)
     statename = county_codes.state_names[state]
     counties = county_codes.counties[statename]
+    print("reading dir:", path)
     dfs = []
     for fn in os.listdir(path):
       if fn not in counties:
