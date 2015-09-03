@@ -99,3 +99,10 @@ class Reader:
     ret = pd.concat(dfs, axis=1)
     ret.sort(axis=1, inplace=True)
     return ret
+
+def read_county_stata(path):
+  assert path.endswith('.dta'), "not Stata file"
+  d = pd.read_stata(path)
+  d.set_index(['stateansi','countyansi','year'], inplace=True)
+  d.dropna(subset='countyansi', inplace=True)
+  return d
