@@ -5,16 +5,16 @@ from loanrates import county_codes
 column_names = [
   'commodity',
   'date',
-  'loan_rate',
+  'loanrate',
   'pcp_30day',
   'pcp_alternative',
-  'effective_pcp',
+  'pcp',
   'effective_ldp',
   'effective_acre_ldp',
 ]
 
 # keep_columns = (
-# 'loan_rate', 'effective_pcp', 'effective_ldp'
+# 'loanrate', 'pcp', 'effective_ldp'
 # )
 
 drop_columns = [
@@ -23,6 +23,7 @@ drop_columns = [
   # These are always(?) NaN
   'pcp_30day',
   'pcp_alternative',
+  'effective_ldp',
   'effective_acre_ldp',
 ]
 
@@ -53,8 +54,10 @@ def get_state_county(fp):
 
 class Reader:
   def __init__(self, root):
-    self.root= root
+    self.root= os.path.abspath(root)
 
+  def __repr__(self):
+    return 'Reader(%s)' % repr(self.root)
 
   def process_all_files(self, state, county):
     path = os.path.join(self.root, state, county)
@@ -65,7 +68,7 @@ class Reader:
       print("reading:", fpath)
       d = read_csv(fpath)
       # Use multi-index for better organization
-      index = pd.MultiIndex.from_product([[state], [county], d.columns])
+      index = pd.MultiIndex.from_product([d.columns, [int(state)], [int(county)]])
       d.columns = index
       assert not d.isnull().any().any(), d
       dfs.append(d)
