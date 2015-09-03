@@ -1,7 +1,7 @@
 #!/bin/python3
 
 import sys
-from loanrates import fetch
+from commloans import fetch
 
 def main(args):
   if len(args) < 3:

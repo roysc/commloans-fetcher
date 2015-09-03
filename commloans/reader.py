@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from loanrates import county_codes
+from commloans import county_codes
 
 column_names = [
   'commodity',
