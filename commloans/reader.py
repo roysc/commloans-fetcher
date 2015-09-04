@@ -27,7 +27,8 @@ drop_columns = [
   'effective_acre_ldp',
 ]
 
-def read_csv(fp):
+def read_csv_usda(fp):
+  "Read a CSV from the USDA ACR web app"
   from itertools import islice
 
   d = pd.read_csv(fp,
