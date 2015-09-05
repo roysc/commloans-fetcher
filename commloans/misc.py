@@ -63,8 +63,12 @@ def _ez_price_mean(alldata, st, h, planting=False):
   return g.mean()
 
 def ez_dateloop(data, h):
-  means = pd.DataFrame(columns=data)
-  for st in cc.state_names:
+  # means = pd.DataFrame(columns=data.columns)
+  means = {}
+  # for st in cc.state_names.keys():
+  for st in h.index:
     m = ez_harvest_price_mean(data, st, h)
     means[st] = m
-  return means
+    
+  return pd.concat(means,axis=1)
+  # return means
