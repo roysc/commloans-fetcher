@@ -25,10 +25,10 @@ def yearly_dates(ix, startmd, endmd):
   ret = pd.Series(index=ix)
   ret[:] = False
   for y in years:
-    ret = ret | getdates(y)
+    ret |= getdates(y)
   return ret
 
-def read_harvest_dates(f):
+def read_dates(f):
 
   def splitdm(col):
     s = col.str.strip()
@@ -46,11 +46,25 @@ def read_harvest_dates(f):
   return ranges
 
 
-def ez_harvest_price_mean(alldata, st, h):
-  
+def ez_harvest_price_mean(d, st, h):
+  return _ez_price_mean(d, st, h, False)
+def ez_plant_price_mean(d, st, h):
+  return _ez_price_mean(d, st, h, True)
+
+def _ez_price_mean(alldata, st, h, planting=False):
   dates = h.loc[st]
   d = alldata[st]
   i = yearly_dates(d.index, dates['start'], dates['end'])
+  if planting:
+      i |= (('2004-06-01' <= i.index) & (i.index <= '2004-07-01'))
+
   d = d.ix[i]
   g = d.groupby(d.index.year)
   return g.mean()
+
+def ez_dateloop(data, h):
+  means = pd.DataFrame(columns=data)
+  for st in cc.state_names:
+    m = ez_harvest_price_mean(data, st, h)
+    means[st] = m
+  return means
