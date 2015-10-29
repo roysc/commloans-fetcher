@@ -16,10 +16,33 @@ def debug(*a):
 acr_url = 'https://apps.fsa.usda.gov/acr/'
 # download_root = './'
 
+COMMODITY_OPTIONS = {
+  'BARLEY',
+  'CANOLA',
+  'CORN',
+  'CRAMBE',
+  'DRY PEAS',
+  'FLAXSEED',
+  'GRAIN SORGHUM',
+  'MUSTARD SEED',
+  'OATS',
+  'RAPESEED',
+  'RICE',
+  'SAFFLOWER',
+  'SOYBEANS',
+  'SUNFLOWER OIL',
+  'SUNFLOWER SEED',
+  'WHEAT',
+}
+
 class Fetcher:
     
-  def __init__(self, download_root):
+  def __init__(self, download_root, commodity='CORN', years=range(2004, 2009)):
     self.download_root = download_root
+    if commodity not in COMMODITY_OPTIONS:
+      raise ValueError('invalid commodity')
+    self.commodity = commodity
+    self.years = years
     linkname = str(uuid.uuid4())
     self._dltarget = os.path.join(download_root, linkname)
     self._dr = Fetcher._make_driver(self._dltarget)
@@ -123,7 +146,7 @@ class Fetcher:
     Select(elt_cropyear).select_by_visible_text(str(cropyear))
 
     elt_commodity = self._dr.find_element_by_id('commodity')
-    Select(elt_commodity).select_by_visible_text('CORN')
+    Select(elt_commodity).select_by_visible_text(self.commodity)
 
     # xpath_run = '//*[@title="Run Report"]'
     # btn_run = self._dr.find_element_by_xpath(xpath_run)
@@ -155,7 +178,7 @@ class Fetcher:
   
   def request_all_years(self, state, county, cont=True):
     res = []
-    for year in range(2004, 2009):
+    for year in self.years:
       attempts = 5
       while attempts > 0:
         try:
