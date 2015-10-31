@@ -1,7 +1,6 @@
 import pandas as pd
 from datetime import datetime, timedelta
 
-from commloans import county_codes as cc
 
 def ez_read_csv(f):
   d = pd.read_csv(f, header=[0,1], parse_dates=0, index_col=0)
@@ -63,12 +62,23 @@ def _ez_price_mean(alldata, st, h, planting=False):
   return g.mean()
 
 def ez_dateloop(data, h):
-  # means = pd.DataFrame(columns=data.columns)
   means = {}
-  # for st in cc.state_names.keys():
   for st in h.index:
     m = ez_harvest_price_mean(data, st, h)
     means[st] = m
-    
   return pd.concat(means,axis=1)
-  # return means
+
+from commloans import county_codes as cc
+statecodes = sorted(cc.state_names.keys())
+
+def job_fetch_state(dir, comm, s):
+  from os import path
+  from commloans import fetch
+  from pyvirtualdisplay import Display
+  
+  dir = path.realpath(dir)
+  display = Display(visible=0)
+  display.start()
+  f = fetch.Fetcher(dir, comm)
+  return f.request_all_counties(s)
+  

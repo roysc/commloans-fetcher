@@ -37,8 +37,8 @@ COMMODITY_OPTIONS = {
 
 class Fetcher:
     
-  def __init__(self, download_root, commodity='CORN', years=range(2004, 2009)):
-    self.download_root = download_root
+  def __init__(self, download_root, commodity, years=range(2004, 2015)):
+    self.download_root = os.path.realpath(download_root)
     if commodity not in COMMODITY_OPTIONS:
       raise ValueError('invalid commodity')
     self.commodity = commodity
@@ -114,14 +114,14 @@ class Fetcher:
     return by_value, by_name
 
   def request_data(self, state, county, year):
-    debug('request_data:', county_codes.state_names[state], county, year)
+    debug('request_data:', county_codes.state_names[state], '(%s)'%state, county, year)
     
     self.get_homepage()
     
     elt_state = self._dr.find_element_by_id('state')
     elt_county = self._dr.find_element_by_id('county')
 
-    Select(elt_state).select_by_value(state)
+    Select(elt_state).select_by_value('%02d'%state)
     self._wait_for_counties(elt_county)
 
     elt_county = self._dr.find_element_by_id('county')
@@ -186,14 +186,12 @@ class Fetcher:
             res.append((state, county, year))
           break
         except sexc.WebDriverException as e:
-          if cont:
-            debug(" error:", e)
-          else: raise e
-          debug(" attempts:", attempts)
+          debug(" error:", e)
+          debug(" attempts left:", attempts)
           attempts -= 1
           if not attempts:
             debug(" max attempts made", state, county)
-          #   raise e
+            if not cont: raise e
     return res
     
   def request_all_counties(self, state, counties=None, from_=None):
@@ -201,10 +199,19 @@ class Fetcher:
     if counties is None:
       counties = county_codes.counties[name]
     if from_ is not None:
-      counties = [cty for cty in counties if from_ <= cty]
+      counties = [cty for cty in counties if from_ <= int(cty)]
     # debug("counties:", counties)
     res = []
     for county in counties:
       r = self.request_all_years(state, county)
       res.extend(r)
     return res
+
+class FetcherFactory:
+  def __init__(self, download_root, commodity, years):
+    self.dlroot = download_root
+    self.commodity = commodity
+    self.years = years
+
+  def create(self):
+    return Fetcher(self.dlroot, self.commodity, self.years)
