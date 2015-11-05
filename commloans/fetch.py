@@ -65,6 +65,9 @@ class Fetcher:
     options.add_experimental_option('prefs', prefs)
     return webdriver.Chrome(chrome_options=options)
 
+  def close(self):
+    self._dr.close()
+  
   def set_dlpath(self, path):
     # Hack: download dir is symlink, just change its target
     if os.path.exists(self._dltarget):
@@ -177,13 +180,13 @@ class Fetcher:
     return True
   
   def request_all_years(self, state, county, cont=True):
-    res = []
+    res = {}
     for year in self.years:
-      attempts = 5
+      attempts = 10
       while attempts > 0:
         try:
           if self.request_data(state, county, year):
-            res.append((state, county, year))
+            res[(state, county, year)] = True
           break
         except sexc.WebDriverException as e:
           debug(" error:", e)
@@ -191,20 +194,23 @@ class Fetcher:
           attempts -= 1
           if not attempts:
             debug(" max attempts made", state, county)
+            res[(state, county, year)] = False
             if not cont: raise e
+          self._dr.refresh()
+
     return res
     
   def request_all_counties(self, state, counties=None, from_=None):
     name = county_codes.state_names[state]
     if counties is None:
-      counties = county_codes.counties[name]
+      counties = county_codes.counties[state]
     if from_ is not None:
       counties = [cty for cty in counties if from_ <= int(cty)]
     # debug("counties:", counties)
-    res = []
+    res = {}
     for county in counties:
       r = self.request_all_years(state, county)
-      res.extend(r)
+      res.update(r)
     return res
 
 class FetcherFactory:

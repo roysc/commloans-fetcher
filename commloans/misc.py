@@ -14,7 +14,6 @@ def yearly_dates(ix, startmd, endmd):
   m0, d0 = startmd
   m1, d1 = endmd
   fmt = '{}-{:02}-{:02}'
-
   def getdates(y):
     start = fmt.format(y, m0, d0)
     end = fmt.format(y, m1, d1)
@@ -28,7 +27,6 @@ def yearly_dates(ix, startmd, endmd):
   return ret
 
 def read_dates(f):
-
   def splitdm(col):
     s = col.str.strip()
     s = s.str.split()
@@ -36,14 +34,12 @@ def read_dates(f):
     for m, d in s:
       l.append((datetime.strptime(m, '%b').month, int(d)))
     return pd.Series(l, index=s.index)
-
   d = pd.read_csv(f,index_col=0)
   start = splitdm(d['start'])
   end = splitdm(d['end'])
   ranges = pd.concat({'start':start,'end':end},axis=1)
   
   return ranges
-
 
 def ez_harvest_price_mean(d, st, h):
   return _ez_price_mean(d, st, h, False)
@@ -72,13 +68,14 @@ from commloans import county_codes as cc
 statecodes = sorted(cc.state_names.keys())
 
 def job_fetch_state(dir, comm, s):
-  from os import path
   from commloans import fetch
   from pyvirtualdisplay import Display
   
-  dir = path.realpath(dir)
   display = Display(visible=0)
   display.start()
   f = fetch.Fetcher(dir, comm)
-  return f.request_all_counties(s)
+  r = f.request_all_counties(s)
+  f.close()
+  display.stop()
+  return r
   

@@ -55,23 +55,25 @@ def get_state_county(fp):
 
 class Reader:
   def __init__(self, root):
-    self.root= os.path.abspath(root)
+    self.root= os.path.realpath(root)
+    assert os.path.exists(self.root), self.root
 
   def __repr__(self):
     return 'Reader(%s)' % repr(self.root)
 
   def process_all_files(self, state, county):
-    path = os.path.join(self.root, state, county)
-
+    path = os.path.join(self.root, str(state), county)
     dfs = []
-    for fn in os.listdir(path):
-      fpath = os.path.join(path, fn)
+    for file in os.listdir(path):
+      if not file.endswith('csv'):
+        continue
+      fpath = os.path.join(path, file)
       print("reading:", fpath)
-      d = read_csv(fpath)
+      d = read_csv_usda(fpath)
       # Use multi-index for better organization
       index = pd.MultiIndex.from_product([d.columns, [int(state)], [int(county)]])
       d.columns = index
-      assert not d.isnull().any().any(), d
+      # assert not d.isnull().any().any(), d
       dfs.append(d)
 
     # Deal with empty directory
@@ -81,25 +83,38 @@ class Reader:
     ret = pd.concat(dfs)
     # Drop duplicates
     ret = ret.groupby(level=0).first()
-    ret.sort(inplace=True)
+    ret.sort_index(inplace=True)
     return ret
 
   def process_all_counties(self, state):
-    path = os.path.join(self.root, state)
-    statename = county_codes.state_names[state]
-    counties = county_codes.counties[statename]
+    path = os.path.join(self.root, str(state))
+    # statename = county_codes.state_names[state]
+    counties = county_codes.counties[state]
     print("reading dir:", path)
     dfs = []
-    for fn in os.listdir(path):
-      if fn not in counties:
-        print('bad county code:', fn)
-      d = self.process_all_files(state, fn)
-      assert not d.isnull().any().any(), d
+    files = os.listdir(path)
+    for cty in counties:
+      if cty not in files:
+        print('county dir not found:', cty)
+        continue
+      d = self.process_all_files(state, cty)
+      # assert not d.isnull().any().any(), d
       dfs.append(d)
 
     ret = pd.concat(dfs, axis=1)
-    ret.sort(axis=1, inplace=True)
+    ret.sort_index(axis=1, inplace=True)
     return ret
+
+  def process_all_states(self):
+    states = sorted(county_codes.state_names.keys())
+    dfs = []
+    for s in states:
+      d = self.process_all_counties(s)
+      dfs.append(d)
+    ret = pd.concat(dfs, axis=1)
+    ret.sort_index(axis=1, inplace=True)
+    return ret
+      
 
 def read_county_stata(path):
   assert path.endswith('.dta'), "not Stata file"
