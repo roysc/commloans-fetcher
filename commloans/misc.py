@@ -2,10 +2,17 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 
-def ez_read_csv(f):
+def ez_read(f):
   d = pd.read_csv(f, header=[0,1], parse_dates=0, index_col=0)
   levs = d.columns.levels
   ilevs = [[int(s) for s in l] for l in levs]
+  d.columns.set_levels(ilevs,inplace=True)
+  return d
+
+def ez_read2(f):
+  d = pd.read_csv(f, header=[0,1,2], skiprows=[3],index_col=0, parse_dates=0)
+  levs = d.columns.levels
+  ilevs = levs[:1] + [[int(s) for s in l] for l in levs[1:]]
   d.columns.set_levels(ilevs,inplace=True)
   return d
 

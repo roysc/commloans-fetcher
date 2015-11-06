@@ -108,6 +108,14 @@ class Reader:
   def process_all_states(self):
     states = sorted(county_codes.state_names.keys())
     dfs = []
+    missing = []
+    for s in states:
+      path = os.path.join(self.root, str(s))
+      if not os.path.exists(path):
+        missing.append(s)
+    if missing:
+      raise RuntimeError("missing states", missing)
+        
     for s in states:
       d = self.process_all_counties(s)
       dfs.append(d)
