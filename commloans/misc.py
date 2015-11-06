@@ -2,7 +2,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 
 
-def ez_read(f):
+def ez_read1(f):
   d = pd.read_csv(f, header=[0,1], parse_dates=0, index_col=0)
   levs = d.columns.levels
   ilevs = [[int(s) for s in l] for l in levs]
@@ -34,6 +34,7 @@ def yearly_dates(ix, startmd, endmd):
   return ret
 
 def read_dates(f):
+  "Read lists of harvest prices"
   def splitdm(col):
     s = col.str.strip()
     s = s.str.split()
@@ -45,33 +46,31 @@ def read_dates(f):
   start = splitdm(d['start'])
   end = splitdm(d['end'])
   ranges = pd.concat({'start':start,'end':end},axis=1)
-  
   return ranges
 
-def ez_harvest_price_mean(d, st, h):
-  return _ez_price_mean(d, st, h, False)
-def ez_plant_price_mean(d, st, h):
-  return _ez_price_mean(d, st, h, True)
+def ez_harvest_price_mean(d, st, dates):
+  return _ez_price_mean(d, st, dates, False)
+def ez_plant_price_mean(d, st, dates):
+  return _ez_price_mean(d, st, dates, True)
 
-def _ez_price_mean(alldata, st, h, planting=False):
-  dates = h.loc[st]
-  d = alldata[st]
+def _ez_price_mean(data, st, dates, planting=False):
+  dates = dates.loc[st]
+  d = data[st]
   i = yearly_dates(d.index, dates['start'], dates['end'])
   if planting:
       i |= (('2004-06-01' <= i.index) & (i.index <= '2004-07-01'))
-
   d = d.ix[i]
   g = d.groupby(d.index.year)
   return g.mean()
 
-def ez_dateloop(data, h):
+def ez_dateloop(data, dates, planting):
   means = {}
-  for st in h.index:
-    m = ez_harvest_price_mean(data, st, h)
+  for st in dates.index:
+    m = _ez_price_mean(data, st, dates, planting)
     means[st] = m
   return pd.concat(means,axis=1)
 
-from commloans import county_codes as cc
+import commloans.county_codes as cc
 statecodes = sorted(cc.state_names.keys())
 
 def job_fetch_state(dir, comm, s):
