@@ -1,5 +1,9 @@
 import pandas as pd
 from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
+
+import commloans.county_codes as cc
+statecodes = sorted(cc.state_names.keys())
 
 
 def ez_read1(f):
@@ -16,24 +20,7 @@ def ez_read2(f):
   d.columns.set_levels(ilevs,inplace=True)
   return d
 
-def yearly_dates(ix, startmd, endmd):
-  "Get year-offset datetimeindex for month and day"
-  m0, d0 = startmd
-  m1, d1 = endmd
-  fmt = '{}-{:02}-{:02}'
-  def getdates(y):
-    start = fmt.format(y, m0, d0)
-    end = fmt.format(y, m1, d1)
-    return (start <= ix) & (ix <= end)
-
-  years = ix.groupby(ix.year).keys()
-  ret = pd.Series(index=ix)
-  ret[:] = False
-  for y in years:
-    ret |= getdates(y)
-  return ret
-
-def read_dates(f):
+def read_dates_simple(f):
   "Read lists of harvest prices"
   def splitdm(col):
     s = col.str.strip()
@@ -48,30 +35,95 @@ def read_dates(f):
   ranges = pd.concat({'start':start,'end':end},axis=1)
   return ranges
 
-def ez_harvest_price_mean(d, st, dates):
-  return _ez_price_mean(d, st, dates, False)
-def ez_plant_price_mean(d, st, dates):
-  return _ez_price_mean(d, st, dates, True)
+def read_dates(f):
+  import re
+  rxdates = "{d} +{d} - {d} +{d}".format(d=r"(\w{3}) (\d{1,2})")
+  rx = r"(?P<state>\w+) \.*: *\S+ +%s +%s" % (rxdates, rxdates)
+  rx = re.compile(rx)
+  
+  mi = pd.MultiIndex.from_product([['plant','harvest'], ['start','end']])
+  d = pd.DataFrame(columns=mi, index=statecodes)
+  with open(f) as file:
+    for line in file:
+      m = rx.match(line)
+      if m:
+        groups = m.groups()
+        dates = []
+        positions = [0, 3, 4, 7] # positions of start-end dates
+        for pos in positions:
+          i = 1 + 2*pos
+          mon, day = groups[i:i+2]
+          dates.append((datetime.strptime(mon, '%b').month, int(day)))
+        sc = cc.state_codes[m.group('state').upper()]
+        d.ix[sc] = dates
+  d.dropna(inplace=1)
+  return d
 
-def _ez_price_mean(data, st, dates, planting=False):
-  dates = dates.loc[st]
+def yearly_intervals(ix, indexer):
+  "Get yearly intervals from sub-year date ranges"
+  years = ix.groupby(ix.year).keys()
+  ret = pd.DataFrame(index=ix,columns=['mask','bucket'])
+  ret['mask'] = False
+  for y in years:
+    also = indexer(y, ix)
+    ret['mask'] |= also
+    ret['bucket'].ix[also] = y
+  return ret
+
+
+def annual_startend(start, end):
+  m0, d0 = start
+  m1, d1 = end
+  def f(y, ix):
+    a = datetime(y, m0, d0)
+    b = datetime(y, m1, d1)
+    return (a <= ix) & (ix <= b)
+  return f
+
+def price_mean(data, dates, st, planting):
+  """Calculate price mean in a certain range of dates
+  planting: whether to calculate planting price (and include June '04 data)
+  """
+  kind = 'plant' if planting else 'harvest'
+  dates = dates[kind].loc[st]
   d = data[st]
-  i = yearly_dates(d.index, dates['start'], dates['end'])
+  f = annual_startend(dates['start'], dates['end'])
+  i = yearly_intervals(d.index, f)
   if planting:
-      i |= (('2004-06-01' <= i.index) & (i.index <= '2004-07-01'))
-  d = d.ix[i]
+      i['mask'] |= (('2004-06-01' <= i.index) & (i.index <= '2004-07-01'))
+  d = d.ix[i['mask']]
   g = d.groupby(d.index.year)
   return g.mean()
 
-def ez_dateloop(data, dates, planting):
-  means = {}
-  for st in dates.index:
-    m = _ez_price_mean(data, st, dates, planting)
-    means[st] = m
-  return pd.concat(means,axis=1)
+def annual_startplus(start, plus):
+  m0, d0 = start
+  def f(y, ix):
+    a = datetime(y, m0, d0)
+    b = a + relativedelta(months=plus)
+    return (a <= ix) & (ix <= b)
+  return f
 
-import commloans.county_codes as cc
-statecodes = sorted(cc.state_names.keys())
+def price_min_postharvest(data, dates, st):
+  dates = dates['harvest'].loc[st]
+  d = data[st]
+  f = annual_startplus(dates['start'], 9)
+  i = yearly_intervals(d.index, f)
+  d = d.ix[i['mask']]
+  g = d.groupby(i['bucket'])
+  return g.min()
+
+def aggregate_states(f):
+  def retfun(data, dates, *args):
+    means = {}
+    for st in dates.index:
+      m = f(data, dates, st, *args)
+      means[st] = m
+    return pd.concat(means,axis=1)
+  return retfun
+  
+price_mean_all = aggregate_states(price_mean)
+price_min_postharvest_all = aggregate_states(price_min_postharvest)
+
 
 def job_fetch_state(dir, comm, s):
   from commloans import fetch
@@ -84,4 +136,15 @@ def job_fetch_state(dir, comm, s):
   f.close()
   display.stop()
   return r
-  
+
+def calc_prices(crop, path='./'):
+  pcp = ez_read1(os.path.join(path, 'pcp', crop+'.csv'))
+  dates = read_dates(os.path.join(path, 'dates', crop+'.txt'))
+  # Prices
+  plant_avg = ez_price_mean_all(pcp, dates, 1)
+  harv_avg = ez_price_mean_all(pcp, dates, 0)
+  postharv_min = price_min_postharvest(pcp, dates)
+  harv_avg_prev = harv_avg.shift(1)
+
+
+
