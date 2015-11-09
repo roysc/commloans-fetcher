@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
@@ -141,10 +142,16 @@ def calc_prices(crop, path='./'):
   pcp = ez_read1(os.path.join(path, 'pcp', crop+'.csv'))
   dates = read_dates(os.path.join(path, 'dates', crop+'.txt'))
   # Prices
-  plant_avg = ez_price_mean_all(pcp, dates, 1)
-  harv_avg = ez_price_mean_all(pcp, dates, 0)
-  postharv_min = price_min_postharvest(pcp, dates)
-  harv_avg_prev = harv_avg.shift(1)
+  d = price_mean_all(pcp, dates, 1) # planting
+  # d = price_mean_all(pcp, dates, 0) # harvest
+  # d = price_min_postharvest(pcp, dates)
+  # d = harv_avg.shift(1)
+  return d
 
-
-
+def calc_bins(data, n):
+  min = data.min()
+  diff = data.max() - min
+  intervals = (data - min) / (diff / n)
+  intervals = intervals.round(0)
+  d = pd.DataFrame({'value': data.T.stack(), 'bin': intervals.T.stack()})
+  return d
