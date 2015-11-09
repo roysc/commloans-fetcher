@@ -68,7 +68,7 @@ def yearly_intervals(ix, indexer):
   for y in years:
     also = indexer(y, ix)
     ret['mask'] |= also
-    ret['bucket'].ix[also] = y
+    ret.loc[also, 'bucket'] = y
   return ret
 
 
@@ -86,7 +86,7 @@ def price_mean(data, dates, st, planting):
   planting: whether to calculate planting price (and include June '04 data)
   """
   kind = 'plant' if planting else 'harvest'
-  dates = dates[kind].loc[st]
+  dates = dates.loc[st, kind]
   d = data[st]
   f = annual_startend(dates['start'], dates['end'])
   i = yearly_intervals(d.index, f)
@@ -138,14 +138,18 @@ def job_fetch_state(dir, comm, s):
   display.stop()
   return r
 
-def calc_prices(crop, path='./'):
+def calc_prices(crop, how='p', path='./'):
   pcp = ez_read1(os.path.join(path, 'pcp', crop+'.csv'))
   dates = read_dates(os.path.join(path, 'dates', crop+'.txt'))
   # Prices
-  d = price_mean_all(pcp, dates, 1) # planting
-  # d = price_mean_all(pcp, dates, 0) # harvest
-  # d = price_min_postharvest(pcp, dates)
-  # d = harv_avg.shift(1)
+  if how == 'p':
+    d = price_mean_all(pcp, dates, 1) # planting
+  elif how == 'h':
+    d = price_mean_all(pcp, dates, 0) # harvest
+  elif how == 'min':
+    d = price_min_postharvest_all(pcp, dates)
+  elif how == 'prev':
+    d = price_mean_all(pcp, dates, 0).shift(1) # harvest
   return d
 
 def calc_bins(data, n):
