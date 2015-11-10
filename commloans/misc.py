@@ -218,7 +218,12 @@ def plot_rdgraph(diff, area_next, nbins=20, outdir='./'):
 
   return fig
 
-def ez_save_plot(pr, lr, anext, crop, kind='lastp', nbins=40):
+# Convenience
+def ez_save_plot(pr, lr, anext, crop, kind='all', nbins=40):
+  if kind == 'all':
+    for k in 'plantp harvestp minp lastp'.split():
+      ez_save_plot(pr, lr, anext, crop, k, nbins)
+    return
   fig = plot_rdgraph((pr[kind]-lr)[crop], anext[crop], nbins)
   plt.xlabel('PCP - Loanrate ($)')
   plt.ylabel('Area planted (ac.)')
