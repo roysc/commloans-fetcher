@@ -3,6 +3,8 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
+  
+import matplotlib.pyplot as plt
 
 import commloans.county_codes as cc
 statecodes = sorted(cc.state_names.keys())
@@ -196,25 +198,37 @@ def calc_bins(data, n):
   intervals = intervals.round(0)
   return intervals
 
-def make_rdgraph(diff, area_next, nbins=20):
-  "make_rdgraph(prices - lr)"
+def plot_rdgraph(diff, area_next, nbins=20, outdir='./'):
+  "plot_rdgraph(prices - lr)"
   
   d = pd.concat({'diff':diff, 'area':area_next}, axis=1, join_axes=[diff.index])
   bins = np.linspace(diff.min(), diff.max(), nbins)
-  bix = pd.cut(diff, bins, labels=False)
+  bix = pd.cut(diff, bins, labels=bins[:-1])
   g = d.groupby(bix)
-
-  
-  import matplotlib.pyplot as plt
+  midmean = g.agg({'diff':'median','area':'mean'})
 
   fig = plt.figure()
   plt.scatter(bix, d['area'], color='blue')
+  plt.scatter(midmean.index, midmean['area'], color='red')
   # plot regression line...
   plt.axvline(x=0, color='black', linestyle='--')
 
   # Train OLS on mean -> mean
   # g.mean()
-  
+
   return fig
-  
-  
+
+def ez_save_plot(pr, lr, anext, crop, kind='lastp', nbins=40):
+  fig = plot_rdgraph((pr[kind]-lr)[crop], anext[crop], nbins)
+  plt.xlabel('PCP - Loanrate ($)')
+  plt.ylabel('Area planted (ac.)')
+  plt.yscale('log')
+  path = '%s-%s-%s.png'%(crop,kind,nbins)
+  print('saving to', path)
+  plt.savefig(path)
+
+def plot_save_rdgraph():
+  return
+
+def regression():
+  return 
