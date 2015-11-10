@@ -199,35 +199,55 @@ def calc_bins(data, n):
   return intervals
 
 def plot_rdgraph(diff, area_next, nbins=20, outdir='./'):
-  "plot_rdgraph(prices - lr)"
-  
+  """Plot RD graph.
+  diff: price difference (pcp - loanrate)
+  area_next: next year's area planted
+  """
+
+  # Concatenate the data for price difference and next year's planted area
+  # this combines them horizonally, so you end up with 2 columns, named diff and area
+  # The index needs to be consistent so the data can be grouped
   d = pd.concat({'diff':diff, 'area':area_next}, axis=1, join_axes=[diff.index])
+  # Get an array of N evenly distributed x-axis points for bin boundaries
   bins = np.linspace(diff.min(), diff.max(), nbins)
+  # Bin indices ("ix" is short for index) from "cutting" the data according to the bins
+  # labels will be how they are identified. To make it clear, each bin is labeled with
+  # its lower bound
   bix = pd.cut(diff, bins, labels=bins[:-1])
+  # Group data (combined price & area) according to bin indices
   g = d.groupby(bix)
+  # "Agg"regate by taking median of the price differences, and mean of the area planted
   midmean = g.agg({'diff':'median','area':'mean'})
 
+  # Create graph...
   fig = plt.figure()
+  plt.xlabel('PCP - Loanrate ($)')
+  plt.ylabel('Area planted (ac.)')
+  plt.yscale('log')             # logarithmic y-axis
+  
+  # Scatter plot original area data
   plt.scatter(bix, d['area'], color='blue')
+  # Overlay with mean of data
   plt.scatter(midmean.index, midmean['area'], color='red')
-  # plot regression line...
+  # TODO: plot regression line...
+  # Vertical line at 0
   plt.axvline(x=0, color='black', linestyle='--')
-
-  # Train OLS on mean -> mean
-  # g.mean()
+  
+  # TODO: Train OLS on median -> mean values...
 
   return fig
 
 # Convenience
 def ez_save_plot(pr, lr, anext, crop, kind='all', nbins=40):
+  "Create and save plot with a reasonable name"
+  # Pass "all" to do all price types at once
   if kind == 'all':
     for k in 'plantp harvestp minp lastp'.split():
       ez_save_plot(pr, lr, anext, crop, k, nbins)
     return
+  
   fig = plot_rdgraph((pr[kind]-lr)[crop], anext[crop], nbins)
-  plt.xlabel('PCP - Loanrate ($)')
-  plt.ylabel('Area planted (ac.)')
-  plt.yscale('log')
+  # String substitution: %s is replaced with a string or int
   path = '%s-%s-%s.png'%(crop,kind,nbins)
   print('saving to', path)
   plt.savefig(path)
