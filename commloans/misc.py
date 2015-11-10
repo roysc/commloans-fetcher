@@ -198,26 +198,26 @@ def calc_bins(data, n):
   intervals = intervals.round(0)
   return intervals
 
-def plot_rdgraph(diff, area_next, nbins=20, outdir='./'):
+def plot_rdgraph(x, y, nbins=20, outdir='./'):
   """Plot RD graph.
-  diff: price difference (pcp - loanrate)
-  area_next: next year's area planted
+  x: X-axis variable, e.g. price difference (pcp - loanrate)
+  y: outcome Y-axis variable, e.g. next year's area planted
   """
 
-  # Concatenate the data for price difference and next year's planted area
-  # this combines them horizonally, so you end up with 2 columns, named diff and area
+  # Concatenate the data for X and outcome variable
+  # this combines them horizonally, so you end up with 2 columns, named X and Y
   # The index needs to be consistent so the data can be grouped
-  d = pd.concat({'diff':diff, 'area':area_next}, axis=1, join_axes=[diff.index])
-  # Get an array of N evenly distributed x-axis points for bin boundaries
-  bins = np.linspace(diff.min(), diff.max(), nbins)
+  d = pd.concat({'X':x, 'Y':y}, axis=1, join_axes=[x.index])
+  # Get an array of N evenly distributed X-axis points for bin boundaries
+  bins = np.linspace(x.min(), x.max(), nbins)
   # Bin indices ("ix" is short for index) from "cutting" the data according to the bins
   # labels will be how they are identified. To make it clear, each bin is labeled with
   # its lower bound
-  bix = pd.cut(diff, bins, labels=bins[:-1])
-  # Group data (combined price & area) according to bin indices
+  bix = pd.cut(x, bins, labels=bins[:-1])
+  # Group data (combined X & Y) according to bin indices
   g = d.groupby(bix)
-  # "Agg"regate by taking median of the price differences, and mean of the area planted
-  midmean = g.agg({'diff':'median','area':'mean'})
+  # "Agg"regate by taking median of X values, and mean of the outcome
+  midmean = g.agg({'X':'median','Y':'mean'})
 
   # Create graph...
   fig = plt.figure()
@@ -226,27 +226,28 @@ def plot_rdgraph(diff, area_next, nbins=20, outdir='./'):
   plt.yscale('log')             # logarithmic y-axis
   
   # Scatter plot original area data
-  plt.scatter(bix, d['area'], color='blue')
+  plt.scatter(bix, d['Y'], color='blue')
   # Overlay with mean of data
-  plt.scatter(midmean.index, midmean['area'], color='red')
-  # TODO: plot regression line...
+  plt.scatter(midmean.index, midmean['Y'], color='red')
   # Vertical line at 0
   plt.axvline(x=0, color='black', linestyle='--')
   
-  # TODO: Train OLS on median -> mean values...
+  # TODO: Train OLS on median -> mean values, plot regression line...
 
   return fig
 
 # Convenience
-def ez_save_plot(pr, lr, anext, crop, kind='all', nbins=40):
+def ez_save_plot(pr, lr, y, crop, kind='all', nbins=40):
   "Create and save plot with a reasonable name"
   # Pass "all" to do all price types at once
   if kind == 'all':
     for k in 'plantp harvestp minp lastp'.split():
-      ez_save_plot(pr, lr, anext, crop, k, nbins)
+      ez_save_plot(pr, lr, y, crop, k, nbins)
     return
-  
-  fig = plot_rdgraph((pr[kind]-lr)[crop], anext[crop], nbins)
+
+  if len(y.shape ) > 1:
+    y = y[crop]
+  fig = plot_rdgraph((pr[kind]-lr)[crop], y, nbins)
   # String substitution: %s is replaced with a string or int
   path = '%s-%s-%s.png'%(crop,kind,nbins)
   print('saving to', path)
