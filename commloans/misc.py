@@ -189,16 +189,7 @@ def getall_prices(crop):
   return pd.concat(ds, axis=1)
 
 
-
-def calc_bins(data, n):
-  "Split into bins, return interval indices"
-  min = data.min()
-  diff = data.max() - min
-  intervals = (data - min) / (diff / n)
-  intervals = intervals.round(0)
-  return intervals
-
-def plot_rdgraph(x, y, nbins=20, outdir='./'):
+def plot_rdgraph(x, y, nbins, outdir='./'):
   """Plot RD graph.
   x: X-axis variable, e.g. price difference (pcp - loanrate)
   y: outcome Y-axis variable, e.g. next year's area planted
@@ -209,7 +200,13 @@ def plot_rdgraph(x, y, nbins=20, outdir='./'):
   # The index needs to be consistent so the data can be grouped
   d = pd.concat({'X':x, 'Y':y}, axis=1, join_axes=[x.index])
   # Get an array of N evenly distributed X-axis points for bin boundaries
-  bins = np.linspace(x.min(), x.max(), nbins)
+  # with one bin having a boundary at exactly 0
+  mn, mx = x.min(), x.max()
+  binsize = (mx - mn)/(nbins-2)
+  shift = (np.floor(mn/binsize) - mn/binsize)
+  mn += shift * binsize
+  mx += (1 + shift) * binsize
+  bins = np.linspace(mn, mx, nbins)
   # Bin indices ("ix" is short for index) from "cutting" the data according to the bins
   # labels will be how they are identified. To make it clear, each bin is labeled with
   # its lower bound
@@ -219,37 +216,40 @@ def plot_rdgraph(x, y, nbins=20, outdir='./'):
   # "Agg"regate by taking median of X values, and mean of the outcome
   midmean = g.agg({'X':'median','Y':'mean'})
 
+  print("creating graph.", 'bin size:', binsize)
   # Create graph...
   fig = plt.figure()
-  plt.xlabel('PCP - Loanrate ($)')
-  plt.ylabel('Area planted (ac.)')
   plt.yscale('log')             # logarithmic y-axis
   
   # Scatter plot original area data
-  plt.scatter(bix, d['Y'], color='blue')
+  plt.scatter(bix, d['Y'], color='blue', marker='+')
   # Overlay with mean of data
   plt.scatter(midmean.index, midmean['Y'], color='red')
   # Vertical line at 0
-  plt.axvline(x=0, color='black', linestyle='--')
+  plt.axvline(x=binsize/2, color='black', linestyle='--')
   
   # TODO: Train OLS on median -> mean values, plot regression line...
 
-  return fig
+  return fig, binsize
 
 # Convenience
-def ez_save_plot(pr, lr, y, crop, kind='all', nbins=40):
+def ez_save_plot(pr, lr, y, crop, kind='all', yname=('area','Area planted (ac.)'), nbins=40):
   "Create and save plot with a reasonable name"
   # Pass "all" to do all price types at once
   if kind == 'all':
     for k in 'plantp harvestp minp lastp'.split():
-      ez_save_plot(pr, lr, y, crop, k, nbins)
+      ez_save_plot(pr, lr, y, crop, k, yname,nbins)
     return
 
   if len(y.shape ) > 1:
     y = y[crop]
-  fig = plot_rdgraph((pr[kind]-lr)[crop], y, nbins)
+  fig, binsize = plot_rdgraph((pr[kind]-lr)[crop], y, nbins)
+  fig.suptitle('%s (%s bins, width=%.4f)'%(crop.capitalize(), nbins, binsize))
+  plt.xlabel('PCP - Loanrate ($)')
+  plt.ylabel(yname[1])
+  
   # String substitution: %s is replaced with a string or int
-  path = '%s-%s-%s.png'%(crop,kind,nbins)
+  path = '%s-%s-%s-%s.png'%(crop,kind,yname[0],nbins)
   print('saving to', path)
   plt.savefig(path)
 
