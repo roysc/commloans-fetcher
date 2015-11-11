@@ -189,7 +189,7 @@ def getall_prices(crop):
   return pd.concat(ds, axis=1)
 
 
-def plot_rdgraph(x, y, nbins, outdir='./'):
+def plot_rdgraph(x, y, nbins):
   """Plot RD graph.
   x: X-axis variable, e.g. price difference (pcp - loanrate)
   y: outcome Y-axis variable, e.g. next year's area planted
@@ -252,6 +252,7 @@ def ez_save_plot(pr, lr, y, crop, kind='all', yname=('area','Area planted (ac.)'
   path = '%s-%s-%s-%s.png'%(crop,kind,yname[0],nbins)
   print('saving to', path)
   plt.savefig(path)
+  plt.close()
 
 def plot_save_rdgraph():
   return
