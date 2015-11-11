@@ -207,10 +207,11 @@ def plot_rdgraph(x, y, nbins, outdir='./'):
   mn += shift * binsize
   mx += (1 + shift) * binsize
   bins = np.linspace(mn, mx, nbins)
+  binlabels = np.linspace(mn + binsize/2, mx + binsize/2, nbins)
   # Bin indices ("ix" is short for index) from "cutting" the data according to the bins
   # labels will be how they are identified. To make it clear, each bin is labeled with
   # its lower bound
-  bix = pd.cut(x, bins, labels=bins[:-1])
+  bix = pd.cut(x, bins, labels=binlabels[:-1])
   # Group data (combined X & Y) according to bin indices
   g = d.groupby(bix)
   # "Agg"regate by taking median of X values, and mean of the outcome
@@ -222,14 +223,17 @@ def plot_rdgraph(x, y, nbins, outdir='./'):
   plt.yscale('log')             # logarithmic y-axis
   
   # Scatter plot original area data
-  plt.scatter(bix, d['Y'], color='blue', marker='+')
+  plt.scatter(bix, d['Y'], color='blue', marker='.')
   # Overlay with mean of data
   plt.scatter(midmean.index, midmean['Y'], color='red')
   # Vertical line at 0
-  plt.axvline(x=binsize/2, color='black', linestyle='--')
+  plt.axvline(x=0, color='black', linestyle='--')
   
   # TODO: Train OLS on median -> mean values, plot regression line...
+  import statsmodels.formula.api as smf
 
+  # lm = smf.ols()
+  
   return fig, binsize
 
 # Convenience
@@ -238,11 +242,10 @@ def ez_save_plot(pr, lr, y, crop, kind='all', yname=('area','Area planted (ac.)'
   # Pass "all" to do all price types at once
   if kind == 'all':
     for k in 'plantp harvestp minp lastp'.split():
-      ez_save_plot(pr, lr, y, crop, k, yname,nbins)
+      ez_save_plot(pr, lr, y, crop, k, yname, nbins)
     return
 
-  if len(y.shape ) > 1:
-    y = y[crop]
+  y = y.get(crop) or y
   fig, binsize = plot_rdgraph((pr[kind]-lr)[crop], y, nbins)
   fig.suptitle('%s (%s bins, width=%.4f)'%(crop.capitalize(), nbins, binsize))
   plt.xlabel('PCP - Loanrate ($)')
@@ -253,6 +256,17 @@ def ez_save_plot(pr, lr, y, crop, kind='all', yname=('area','Area planted (ac.)'
   print('saving to', path)
   plt.savefig(path)
 
+def plot_prices():
+  ds={}
+  for f in os.listdir():
+    d=pd.read_csv(f,index_col=0,parse_dates=0,header=[0,1])
+    ds[f[:-4]]=d
+  means={}
+  for k,d in ds.items():
+    means[k]=d.mean(axis=0)
+  p=pd.concat(means,axis=1)
+  p.plot()
+  
 def plot_save_rdgraph():
   return
 
