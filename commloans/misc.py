@@ -230,8 +230,7 @@ def plot_rdgraph(x, y, nbins):
   plt.axvline(x=0, color='black', linestyle='--')
   
   # TODO: Train OLS on median -> mean values, plot regression line...
-  import statsmodels.formula.api as smf
-
+  # import statsmodels.formula.api as smf
   # lm = smf.ols()
   
   return fig, binsize
@@ -272,5 +271,19 @@ def plot_prices():
 def plot_save_rdgraph():
   return
 
-def regression():
-  return 
+def regression(dall, crop):
+  import statsmodels.formula.api as smf
+
+  d = dall[crop]
+  d = pd.concat([d, dall['0']], axis=1)
+  d['diffp'] = (d.minp - d.loanrate > 0)
+  d['D'] = d.diffp.astype(int)
+  d.agchar /= 100
+  d.area_next = np.log(d.area_next)
+  d.area = np.log(d.area)
+  
+  # reg = "area_next ~ D + diffp + D * diffp + pop + agchar"
+  reg = "area_next ~ D + pop + agchar"
+  ls = smf.ols(reg, d)
+  res = ls.fit()
+  return res
