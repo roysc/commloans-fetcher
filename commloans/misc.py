@@ -223,7 +223,7 @@ def plot_rdgraph(x, y, nbins):
   plt.yscale('log')             # logarithmic y-axis
   
   # Scatter plot original area data
-  plt.scatter(bix, d['Y'], color='blue', marker='.')
+  plt.scatter(bix, d['Y'], color='blue', marker='+')
   # Overlay with mean of data
   plt.scatter(midmean.index, midmean['Y'], color='red')
   # Vertical line at 0
@@ -245,7 +245,8 @@ def ez_save_plot(pr, lr, y, crop, kind='all', yname=('area','Area planted (ac.)'
       ez_save_plot(pr, lr, y, crop, k, yname, nbins)
     return
 
-  y = y.get(crop) or y
+  yc = y.get(crop)
+  if yc is not None: y = yc
   fig, binsize = plot_rdgraph((pr[kind]-lr)[crop], y, nbins)
   fig.suptitle('%s (%s bins, width=%.4f)'%(crop.capitalize(), nbins, binsize))
   plt.xlabel('PCP - Loanrate ($)')
