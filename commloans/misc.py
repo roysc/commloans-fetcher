@@ -175,8 +175,6 @@ def cleanup(dir):
     ds[crop.lower()] = d
   return pd.concat(ds,axis=1)
 
-# _crops = 'barley corn  oats  rice  sorghum  soybeans  wheat'.split()
-
 def getall_prices(crop):
   ds = {}
   for k in 'plant harvest min last'.split():
@@ -267,23 +265,3 @@ def plot_prices():
     means[k]=d.mean(axis=0)
   p=pd.concat(means,axis=1)
   p.plot()
-  
-def plot_save_rdgraph():
-  return
-
-def regression(dall, crop):
-  import statsmodels.formula.api as smf
-
-  d = dall[crop]
-  d = pd.concat([d, dall['0']], axis=1)
-  d['diffp'] = (d.minp - d.loanrate > 0)
-  d['D'] = d.diffp.astype(int)
-  d.agchar /= 100
-  d.area_next = np.log(d.area_next)
-  d.area = np.log(d.area)
-  
-  # reg = "area_next ~ D + diffp + D * diffp + pop + agchar"
-  reg = "area_next ~ D + pop + agchar"
-  ls = smf.ols(reg, d)
-  res = ls.fit()
-  return res
