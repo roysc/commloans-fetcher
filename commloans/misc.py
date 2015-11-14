@@ -8,6 +8,8 @@ import matplotlib.pyplot as plt
 
 import commloans.county_codes as cc
 statecodes = sorted(cc.state_names.keys())
+_prices = ['minp', 'lastp', 'harvestp', 'plantp']
+_crops = ['corn','oats','sorghum','soy','wheat']
 
 
 def ez_read2(f,dates=0):
@@ -265,3 +267,88 @@ def plot_prices():
     means[k]=d.mean(axis=0)
   p=pd.concat(means,axis=1)
   p.plot()
+
+def _make_table(data, nlr, price, pricetitle):
+  # import reg
+
+  text_beg = r"""
+\begin{threeparttable}
+\caption{Descriptive statistics: %s}
+\label{des}
+\begin{tabular}{l cccc}
+\hline\hline
+& diff  $<$ 0 & diff $\geq$ 0 & diff nlr $<$ 0 & diff nlr $\geq$ 0\\
+\hline
+"""% pricetitle
+  
+  text_end = r"""\end{tabular}
+\begin{tablenotes}[flushleft]\footnotesize 
+\item[1] Mean value and Standard deviation in parenthesis. 
+\end{tablenotes}
+\end{threeparttable}
+"""
+
+  variables = [
+    ('area', "Acres planted"),
+    ('prod', "Production"),
+  ]
+
+  # Sections
+  # gcrops = data.groupby(level='crop',axis=1)
+  gyear = data[price].groupby(level='year',axis=0)
+  def fnlr(d): return d - nlr.loc[d.name]
+  nlrdiff = gyear.transform(fnlr)
+
+  text_mid = ""
+  for var, vartitle in variables:
+    res = {}
+    for crop in _crops:
+      nums = []
+      # County LR
+      lt = data[price, crop] < data['loanrate', crop]
+      gt = data[price, crop] >= data['loanrate', crop]
+      
+      # National LR is much more complicated, data is shaped differently
+      # group by year
+      nlrlt = nlrdiff[crop] < 0
+      nlrgt = nlrdiff[crop] >= 0
+      
+      for ix in (lt, gt, nlrlt, nlrgt):
+        nums.append((data[var, crop].mean(), data[var, crop].std()))
+      res[crop] = nums
+
+    # Now make the text
+    section = r"\emph{%s} &\\" % vartitle + '\n'
+    
+    for crop, nums in res.items():
+      row = [crop.capitalize()] + [r'\specialcell{%.4f\\(%.4f)}' % n for n in nums]
+      section += ' & '.join(row) + r' \\'+'\n'
+    section += r'\hline' + '\n'
+
+    text_mid += section
+    
+  return text_beg + text_mid + text_end
+
+fancy_prices = [
+  ('minp', "Min. price"),
+  ('lastp', "Last price"),
+  ('plantp', "Planting price"),
+  ('harvestp', "Harvest price"),
+]
+
+def make_table_file(data, nlr, file):
+  tpl = r"""\documentclass{article}
+\usepackage{threeparttablex}
+\newcommand{\specialcell}[2][c]{%%
+  \begin{tabular}[#1]{@{}c@{}}#2\end{tabular}}
+  
+\begin{document}
+%s
+\end{document}
+"""
+
+  with open(file, 'w') as f:
+    s = []
+    for p, pt in fancy_prices:
+      s.append(_make_table(data, nlr, p, pt))
+    f.write(tpl % '\n'.join(s))
