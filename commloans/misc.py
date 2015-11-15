@@ -289,8 +289,8 @@ def _make_table(data, nlr, price, pricetitle):
 """
 
   variables = [
-    ('area', "Acres planted"),
-    ('prod', "Production"),
+    ('area_next', "Acres planted"),
+    ('prod_next', "Production"),
   ]
 
   # Sections
@@ -314,7 +314,8 @@ def _make_table(data, nlr, price, pricetitle):
       nlrgt = nlrdiff[crop] >= 0
       
       for ix in (lt, gt, nlrlt, nlrgt):
-        nums.append((data[var, crop].mean(), data[var, crop].std()))
+        nums.append((data.loc[ix, (var, crop)].mean(),
+                     data.loc[ix, (var, crop)].std()))
       res[crop] = nums
 
     # Now make the text
