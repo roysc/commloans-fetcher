@@ -268,15 +268,18 @@ def plot_prices():
   p=pd.concat(means,axis=1)
   p.plot()
 
-def _make_table(data, nlr, price, pricetitle):
+def _make_table(dataframes, nlr, price, pricetitle):
   # import reg
 
   text_beg = r"""
 \begin{threeparttable}
 \caption{Descriptive statistics: %s}
 \label{des}
-\begin{tabular}{l cccc}
+\begin{tabular}{l cccc|cccc}
 \hline\hline
+& \multicolumn{4}{c}{2004---2008} & \multicolumn{4}{c}{2004---2014} \\
+\hline  
+& diff  $<$ 0 & diff $\geq$ 0 & diff nlr $<$ 0 & diff nlr $\geq$ 0
 & diff  $<$ 0 & diff $\geq$ 0 & diff nlr $<$ 0 & diff nlr $\geq$ 0\\
 \hline
 """% pricetitle
@@ -293,40 +296,49 @@ def _make_table(data, nlr, price, pricetitle):
     ('prod_next', "Production"),
   ]
 
-  # Sections
-  # gcrops = data.groupby(level='crop',axis=1)
-  gyear = data[price].groupby(level='year',axis=0)
-  def fnlr(d): return d - nlr.loc[d.name]
-  nlrdiff = gyear.transform(fnlr)
+  def make_part(data):
+    # gcrops = data.groupby(level='crop',axis=1)
+    gyear = data[price].groupby(level='year',axis=0)
+    def fnlr(d): return d - nlr.loc[d.name]
+    nlrdiff = gyear.transform(fnlr)
 
+    sections = {}
+    for var, vartitle in variables:
+      res = pd.DataFrame(columns=_crops)
+      for crop in _crops:
+        nums = []
+        # County LR
+        lt = data[price, crop] < data['loanrate', crop]
+        gt = data[price, crop] >= data['loanrate', crop]
+        
+        # National LR is much more complicated, data is shaped differently
+        # group by year
+        nlt = nlrdiff[crop] < 0
+        ngt = nlrdiff[crop] >= 0
+        
+        for ix in (lt, gt, nlt, ngt):
+          nums.append((data.loc[ix, (var, crop)].mean(),
+                       data.loc[ix, (var, crop)].std()))
+        res[crop] = nums
+      sections[var] = res
+      
+    return sections
+
+  # All sections for all data parts
+  sections_list = [make_part(d) for d in dataframes]
+
+  # Now make the text
   text_mid = ""
   for var, vartitle in variables:
-    res = {}
-    for crop in _crops:
-      nums = []
-      # County LR
-      lt = data[price, crop] < data['loanrate', crop]
-      gt = data[price, crop] >= data['loanrate', crop]
-      
-      # National LR is much more complicated, data is shaped differently
-      # group by year
-      nlrlt = nlrdiff[crop] < 0
-      nlrgt = nlrdiff[crop] >= 0
-      
-      for ix in (lt, gt, nlrlt, nlrgt):
-        nums.append((data.loc[ix, (var, crop)].mean(),
-                     data.loc[ix, (var, crop)].std()))
-      res[crop] = nums
+    text = r"\emph{%s} \\" % vartitle + '\n'
 
-    # Now make the text
-    section = r"\emph{%s} &\\" % vartitle + '\n'
-    
+    res = pd.concat(secs[var] for secs in sections_list)
     for crop, nums in res.items():
       row = [crop.capitalize()] + [r'\specialcell{%.4f\\(%.4f)}' % n for n in nums]
-      section += ' & '.join(row) + r' \\'+'\n'
-    section += r'\hline' + '\n'
+      text += ' & '.join(row) + r' \\'+'\n'
+    text += r'\hline' + '\n'
 
-    text_mid += section
+    text_mid += text
     
   return text_beg + text_mid + text_end
 

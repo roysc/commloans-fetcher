@@ -29,16 +29,6 @@ def regression(dall, crop, price, term, log=True):
   res = ls.fit()
   return res
 
-# def all_regressions(dall):
-#   results = []
-#   for crop in _crops:
-#     for price in _prices:
-#       for term in ['D * diffp', 'diffp**2']:
-#         for log in [True, False]:
-#           r = regression(dall, crop, price, term, log)
-#           results.append(r)
-#   return results
-
 
 def main(data, out):
   results, titles = [], []
