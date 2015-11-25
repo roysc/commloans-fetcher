@@ -7,6 +7,8 @@ from dateutil.relativedelta import relativedelta
 import matplotlib.pyplot as plt
 
 import commloans.county_codes as cc
+from commloans import reg
+
 statecodes = sorted(cc.state_names.keys())
 _prices = ['minp', 'lastp', 'harvestp', 'plantp']
 _crops = ['corn','oats','sorghum','soy','wheat']
@@ -268,7 +270,7 @@ def plot_prices():
   p=pd.concat(means,axis=1)
   p.plot()
 
-def _make_table(dataframes, nlr, price, pricetitle):
+def _make_table_desc(dataframes, nlr, price, pricetitle):
   # import reg
 
   text_beg = r"""
@@ -343,13 +345,13 @@ def _make_table(dataframes, nlr, price, pricetitle):
   return text_beg + text_mid + text_end
 
 fancy_prices = [
-  ('minp', "Min. price"),
-  ('lastp', "Last price"),
-  ('plantp', "Planting price"),
-  ('harvestp', "Harvest price"),
+  ('minp', "Min price"),
+  # ('lastp', "Last price"),
+  ('plantp', "Price during planting"),
+  ('harvestp', "Price during harvest"),
 ]
 
-def make_table_file(data, nlr, file):
+def make_desc_table_file(data, nlr, file):
   tpl = r"""\documentclass{article}
 \usepackage{threeparttablex}
 \newcommand{\specialcell}[2][c]{%%
@@ -359,9 +361,130 @@ def make_table_file(data, nlr, file):
 %s
 \end{document}
 """
-
+  s = []
+  for p, pt in fancy_prices:
+    s.append(_make_table_desc(data, nlr, p, pt))
   with open(file, 'w') as f:
-    s = []
-    for p, pt in fancy_prices:
-      s.append(_make_table(data, nlr, p, pt))
     f.write(tpl % '\n'.join(s))
+
+
+def _latex_level_slope(d):
+  if d.isnull().any():
+    return r'$\cdot$'
+  pval = d['p']
+  stars = ''
+  if pval < 0.1: stars = r'^{\dag}'
+  if pval < 0.05: stars = r'^{\ast}'
+  if pval < 0.01: stars = r'^{\ast\ast}'
+  cell = r'$\underset{(%.4f)}{%.4f%s}$' % (d['std'], d['val'], stars)
+  return cell
+    
+    
+def _latex_coeff_table(data, crop):
+  
+  tab, aic = reg.make_coeff_table(data, crop)
+  
+  text_beg = r"""
+\newpage
+\begin{threeparttable}
+\caption{Choice of models: %s}
+\label{choose-%s}
+\scalebox{0.93}{\parbox{\linewidth}{
+\begin{tabular}{l c c  c | c c  c}
+\hline\hline
+& \multicolumn{3}{c}{With no covariates} & \multicolumn{3}{c}{With covariates} \\
+\cline{2-4} \cline{5-7} 
+ & Model 1 & Model 2 & Model 3& Model 1 & Model 2& Model 3\\
+""" % (crop, crop)
+  
+  text_end = r"""
+\end{tabular}}}
+\begin{tablenotes}[flushleft]\footnotesize 
+\item[1] $\dag$: $p < 0.1$; $\ast$: $p < 0.05$; $\ast\ast$: $p < 0.01$.
+\end{tablenotes}
+\end{threeparttable}
+"""
+
+  lines = []
+  for p, pt in fancy_prices:
+    lines.append( r"\emph{%s} \\" % pt)
+    for ls in ['level', 'slope']: # pdata.index.get_level_values(0)
+      l = []
+      pdata = tab.loc[p, ls]
+      for col in pdata.columns:
+        d = pdata[col]
+        l.append(_latex_level_slope(d))
+      row = ["Treatment estimate (%s)" % ls.capitalize()] + l
+      lines.append( ' & '.join(row) + r'\\')
+    lines.append(' & '.join(["AIC"] + list('$%.2f$'%x for x in aic.loc[p])) + r'\\')
+    lines.append(r'\hline')
+    
+  return text_beg + '\n'.join(lines) + text_end
+
+
+def latex_coeff_table_file(file, data):
+  tpl = r"""\documentclass[a4paper, 12pt]{article}
+\usepackage{threeparttablex}
+\usepackage{amsmath}
+\usepackage{graphicx}
+
+\begin{document}
+%s
+\end{document}
+"""  
+  s = []
+  for crop in _crops:
+    s.append(_latex_coeff_table(data, crop))
+  with open(file, 'w') as f:
+    f.write(tpl % '\n'.join(s))
+
+
+def _latex_across_crops(dvc, price, pricetitle):
+  text_beg = r"""
+\begin{threeparttable}
+\caption{Effects across crops: %s}
+\label{across-%s}
+\begin{tabular}{l |l c c c c c  }
+\hline\hline
+""" % (pricetitle, price)
+
+  text_end = r"""
+\end{tabular}
+\begin{tablenotes}[flushleft]\footnotesize 
+\item[1] $\dag$: $p < 0.1$; $\ast$: $p < 0.05$; $\ast\ast$: $p < 0.01$.
+\end{tablenotes}
+\end{threeparttable}
+\newpage
+"""
+
+  tab = reg.make_across_crops(dvc, price)
+  
+  lines = []
+  lines.append('& & ' + ' & '.join(_crops) + r'\\ \hline')
+  for crop in _crops:
+    for pre, ls in [(r'\multirow{2}{*}{%s}' % crop, 'level'),
+                    ('', 'slope')]:
+      part = tab.loc[crop, ls]
+      row = [_latex_level_slope(part[c]) for c in part.columns]
+      row = [pre, ls] + row
+      lines.append(' & '.join(row) + r'\\')
+    lines.append(r'\hline')
+
+  return text_beg + '\n'.join(lines) + text_end
+
+def latex_across_crops_file(file, dvc):
+  tpl = r"""\documentclass[a4paper, 12pt]{article}
+\usepackage{threeparttablex}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{multirow}
+
+\begin{document}
+%s
+\end{document}
+"""  
+  s = []
+  for p,pt in fancy_prices:
+    s.append(_latex_across_crops(dvc, p, pt))
+  with open(file, 'w') as f:
+    f.write(tpl % ('\\newpage\n'.join(s)))
