@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import statsmodels.formula.api as smf
 
-from commloans.misc import _crops, _prices
+from commloans.misc import CROPS, PRICES
 
 # _int_terms = ['D * diffp', 'diffp**2']
 
@@ -75,7 +75,7 @@ def get_level_slope(res):
 
 def make_across_crops(dvc, price):
   from itertools import product
-  crop_pairs = product(_crops, _crops)
+  crop_pairs = product(CROPS, CROPS)
 
   def bcast(n, what):
     mi = pd.MultiIndex.from_product([n, what.columns])
@@ -90,10 +90,10 @@ def make_across_crops(dvc, price):
 
   dcv = dvc.swaplevel(0,1,axis=1).sort_index(axis=1)
 
-  rowix = pd.MultiIndex.from_product([_crops,
+  rowix = pd.MultiIndex.from_product([CROPS,
                                       ['level','slope'],
                                       ['val','std','p']])
-  table = pd.DataFrame(index=rowix, columns=_crops)
+  table = pd.DataFrame(index=rowix, columns=CROPS)
   
   for crop1, crop2 in crop_pairs:
     if crop1 == crop2: continue
@@ -133,8 +133,8 @@ def make_coeff_table(dall, crop):
 
 def main(data, out):
   results, titles = [], []
-  for crop in _crops:
-    for price in _prices:
+  for crop in CROPS:
+    for price in PRICES:
       for term, kind in [('D * diffp', "with interaction"),
                          ('diffp**2', "quadratic, without interaction")]:
         for log in [True, False]:
@@ -160,11 +160,4 @@ def main(data, out):
 
   out.write(text % '\n'.join(insert))
 
-
-# if __name__ == '__main__':
-#   import sys
-#   fdata, fout = sys.argv.get[1:3]
-#   data = pd.read_csv(fdata, index_col=[0,1,2], header=[0,1])
-#   out = open(fout, 'w')
-#   main(data, out)
 

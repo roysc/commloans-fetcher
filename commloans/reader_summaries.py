@@ -102,7 +102,7 @@ class SummariesReader(Reader):
     ret['county'] = ret.apply(ccode, axis=1)
     # return ret
     
-    ixcols = ['state', 'county', 'year']
+    ixcols = ['year', 'state', 'county']
     ret.drop(['unit', 'county_name'], axis=1, inplace=1)
     # Account for remapped names by taking sum
     ret = ret.groupby(['comm'] + ixcols).sum()

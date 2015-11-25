@@ -3,15 +3,22 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 from dateutil.relativedelta import relativedelta
-  
 import matplotlib.pyplot as plt
 
 import commloans.county_codes as cc
-from commloans import reg
 
 statecodes = sorted(cc.state_names.keys())
-_prices = ['minp', 'lastp', 'harvestp', 'plantp']
-_crops = ['corn','oats','sorghum','soy','wheat']
+PRICES = ['minp', 'lastp', 'harvestp', 'plantp']
+CROPS = ['corn','oats','sorghum','wheat']
+
+fancy_prices = [
+  ('minp', "Min price"),
+  # ('lastp', "Last price"),
+  ('plantp', "Price during planting"),
+  ('harvestp', "Price during harvest"),
+]
+
+from commloans import reg
 
 
 def ez_read2(f,dates=0):
@@ -306,8 +313,8 @@ def _make_table_desc(dataframes, nlr, price, pricetitle):
 
     sections = {}
     for var, vartitle in variables:
-      res = pd.DataFrame(columns=_crops)
-      for crop in _crops:
+      res = pd.DataFrame(columns=CROPS)
+      for crop in CROPS:
         nums = []
         # County LR
         lt = data[price, crop] < data['loanrate', crop]
@@ -343,13 +350,6 @@ def _make_table_desc(dataframes, nlr, price, pricetitle):
     text_mid += text
     
   return text_beg + text_mid + text_end
-
-fancy_prices = [
-  ('minp', "Min price"),
-  # ('lastp', "Last price"),
-  ('plantp', "Price during planting"),
-  ('harvestp', "Price during harvest"),
-]
 
 def make_desc_table_file(data, nlr, file):
   tpl = r"""\documentclass{article}
@@ -433,7 +433,7 @@ def latex_coeff_table_file(file, data):
 \end{document}
 """  
   s = []
-  for crop in _crops:
+  for crop in CROPS:
     s.append(_latex_coeff_table(data, crop))
   with open(file, 'w') as f:
     f.write(tpl % '\n'.join(s))
@@ -460,8 +460,8 @@ def _latex_across_crops(dvc, price, pricetitle):
   tab = reg.make_across_crops(dvc, price)
   
   lines = []
-  lines.append('& & ' + ' & '.join(_crops) + r'\\ \hline')
-  for crop in _crops:
+  lines.append('& & ' + ' & '.join(CROPS) + r'\\ \hline')
+  for crop in CROPS:
     for pre, ls in [(r'\multirow{2}{*}{%s}' % crop, 'level'),
                     ('', 'slope')]:
       part = tab.loc[crop, ls]
@@ -488,3 +488,62 @@ def latex_across_crops_file(file, dvc):
     s.append(_latex_across_crops(dvc, p, pt))
   with open(file, 'w') as f:
     f.write(tpl % ('\\newpage\n'.join(s)))
+
+
+def howmany(data, p):
+  d = {}
+  for crop in CROPS:
+    # NaNs report false for either condition, so check both
+    lt = data[p, crop] < data['loanrate', crop]
+    gt = data[p, crop] > data['loanrate', crop]
+    d[crop] = (lt.sum(), gt.sum())
+
+  return d
+
+def _latex_howmany(data, p, pt):
+  text_beg = r"""
+\begin{threeparttable}
+\caption{Number of days (%s)
+\label{numdays-%s}}
+\begin{tabular}{l| cc| cc} \hline\hline
+Crop & \multicolumn{2}{c}{2004---2008} & \multicolumn{2}{c}{2004---2014} \\
+      \hline  
+      & diff $<$ 0 & diff $>$ 0 & diff $<$ 0 & diff $>$ 0 \\ \hline
+""" % (pt, p)
+  
+  text_end = r"""
+\hline
+\end{tabular}
+\end{threeparttable}
+\\
+"""
+
+  d08 = data.loc[:2008]
+  hm08 = howmany(d08,p)
+  hm = howmany(data,p)
+  
+  lines = []
+  for c in CROPS:
+    l08, g08 = hm08[c]
+    l14, g14 = hm[c]
+    row = [c.capitalize()] + [str(i) for i in [l08, g08, l14, g14]]
+    lines.append(' & '.join(row) + r'\\')
+
+  return text_beg + '\n'.join(lines) + text_end
+
+
+def latex_howmany_file(file, dvc):
+  tpl = r"""\documentclass[a4paper, 12pt]{article}
+\usepackage{threeparttablex}
+\usepackage{amsmath}
+\usepackage{multirow}
+
+\begin{document}
+%s
+\end{document}
+"""  
+  s = []
+  for p,pt in fancy_prices:
+    s.append(_latex_howmany(dvc, p,pt))
+  with open(file, 'w') as f:
+    f.write(tpl % ('\n'.join(s)))
