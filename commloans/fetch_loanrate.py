@@ -32,9 +32,9 @@ COMMODITY_OPTIONS = {
   'WHEAT',
 }
 
-class LDPRatesFetcher(Fetcher):
+class LoanRateFetcher(Fetcher):
   def __init__(self, download_root, commodity, years=range(2004, 2015)):
-    super(LDPRatesFetcher, self).__init__(download_root)
+    super(LoanRateFetcher, self).__init__(download_root)
     if commodity not in COMMODITY_OPTIONS:
       raise ValueError('invalid commodity')
     self.commodity = commodity

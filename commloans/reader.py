@@ -1,4 +1,4 @@
 from commloans.reader_summaries import SummariesReader
-from commloans.reader_ldprate import LDPRateReader
+from commloans.reader_loanrate import LoanRateReader
 
 

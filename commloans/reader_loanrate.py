@@ -14,10 +14,6 @@ column_names = [
   'effective_acre_ldp',
 ]
 
-# keep_columns = (
-# 'loanrate', 'pcp', 'effective_ldp'
-# )
-
 drop_columns = [
   # Commodity always == "Corn"
   'commodity',
@@ -48,13 +44,8 @@ def read_csv_usda(fp):
   
   return d
 
-def get_state_county(fp):
-  fp = open(path)
-  descr = next(islice(fp, 3, None))
-  # ...
 
-
-class LDPRateReader(Reader):
+class LoanRateReader(Reader):
 
   def process_all_files(self, state, county):
     path = os.path.join(self.root, str(state), county)

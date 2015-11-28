@@ -37,6 +37,18 @@ def ez_read3(f,dates=True):
   d.columns.set_levels(ilevs,inplace=True)
   return d
 
+def ez_read_dir(dir):
+  ds = {}
+  for c in CROPS:
+    path = os.path.join(dir, c+'.csv')
+    print('reading', path)
+    d= pd.read_csv(path, header=[0,1], index_col=0, parse_dates=0)
+    d.columns = pd.MultiIndex.from_tuples([(int(s), int(ct))
+                                    for s, ct in d.columns])
+    ds[c] = d
+  return pd.concat(ds, axis=1)
+
+
 def read_dates_simple(f):
   "Read lists of harvest prices"
   def splitdm(col):
@@ -490,26 +502,26 @@ def latex_across_crops_file(file, dvc):
     f.write(tpl % ('\\newpage\n'.join(s)))
 
 
-def howmany(data, p):
+def howmany(pcp, lr):
   d = {}
+  lt = pcp < lr
+  gt = pcp > lr
   for crop in CROPS:
     # NaNs report false for either condition, so check both
-    lt = data[p, crop] < data['loanrate', crop]
-    gt = data[p, crop] > data['loanrate', crop]
-    d[crop] = (lt.sum(), gt.sum())
+    d[crop] = (lt[crop].sum().sum(), gt[crop].sum().sum())
 
   return d
 
-def _latex_howmany(data, p, pt):
+def _latex_howmany(pcp, lr):
   text_beg = r"""
 \begin{threeparttable}
-\caption{Number of days (%s)
-\label{numdays-%s}}
+\caption{Number of days
+\label{numdays}}
 \begin{tabular}{l| cc| cc} \hline\hline
 Crop & \multicolumn{2}{c}{2004---2008} & \multicolumn{2}{c}{2004---2014} \\
       \hline  
       & diff $<$ 0 & diff $>$ 0 & diff $<$ 0 & diff $>$ 0 \\ \hline
-""" % (pt, p)
+"""
   
   text_end = r"""
 \hline
@@ -518,9 +530,11 @@ Crop & \multicolumn{2}{c}{2004---2008} & \multicolumn{2}{c}{2004---2014} \\
 \\
 """
 
-  d08 = data.loc[:2008]
-  hm08 = howmany(d08,p)
-  hm = howmany(data,p)
+  yr = datetime(2008,1,1)
+  p08 = pcp.loc[:yr]
+  l08 = lr.loc[:yr]
+  hm08 = howmany(p08, l08)
+  hm = howmany(pcp, lr)
   
   lines = []
   for c in CROPS:
@@ -532,7 +546,7 @@ Crop & \multicolumn{2}{c}{2004---2008} & \multicolumn{2}{c}{2004---2014} \\
   return text_beg + '\n'.join(lines) + text_end
 
 
-def latex_howmany_file(file, dvc):
+def latex_howmany_file(file, pcp, lr):
   tpl = r"""\documentclass[a4paper, 12pt]{article}
 \usepackage{threeparttablex}
 \usepackage{amsmath}
@@ -543,7 +557,25 @@ def latex_howmany_file(file, dvc):
 \end{document}
 """  
   s = []
-  for p,pt in fancy_prices:
-    s.append(_latex_howmany(dvc, p,pt))
+  s.append(_latex_howmany(pcp, lr))
   with open(file, 'w') as f:
     f.write(tpl % ('\n'.join(s)))
+
+def graph_pcp_lr(pcp, lr):
+  import matplotlib.pyplot as plt
+
+  pm = pcp.mean(axis=1,level=0)
+  lm = lr.mean(axis=1,level=0)
+
+  cmap = plt.get_cmap('jet_r')
+  plt.figure(figsize=(12,9))
+  plt.ylabel('Price ($)')
+  plt.xlabel('Date')
+  for i, crop in enumerate(CROPS):
+    color = cmap((i)/len(CROPS))
+    print(color)
+    plt.plot(pm.index, pm[crop], label='%s (PCP)'%crop.capitalize(), c=color)
+    plt.plot(lm.index, lm[crop], '--', label='%s (loan rate)'%crop.capitalize(), c=color)
+  plt.legend(loc='best')
+
+  # plt.savefig(file)
