@@ -241,7 +241,6 @@ def plot_rdgraph(x, y, nbins):
   print("creating graph.", 'bin size:', binsize)
   # Create graph...
   fig = plt.figure()
-  plt.yscale('log')             # logarithmic y-axis
   
   # Scatter plot original area data
   plt.scatter(bix, d['Y'], color='blue', marker='+')
@@ -257,8 +256,9 @@ def plot_rdgraph(x, y, nbins):
   return fig, binsize
 
 # Convenience
-def ez_save_plot(pr, lr, y, crop, kind='all', yname=('area','Area planted (ac.)'), nbins=40):
-  "Create and save plot with a reasonable name"
+def ez_save_plot(pr, lr, y, crop, kind='all', yname=('area','Area planted (ac.)'), nbins=40, log=False):
+  """Create and save plot with a reasonable name.
+  yname is (name of y variable, label)"""
   # Pass "all" to do all price types at once
   if kind == 'all':
     for k in 'plantp harvestp minp lastp'.split():
@@ -271,6 +271,7 @@ def ez_save_plot(pr, lr, y, crop, kind='all', yname=('area','Area planted (ac.)'
   fig.suptitle('%s (%s bins, width=%.4f)'%(crop.capitalize(), nbins, binsize))
   plt.xlabel('PCP - Loanrate ($)')
   plt.ylabel(yname[1])
+  if log: plt.yscale('log')     # logarithmic y-axis
   
   # String substitution: %s is replaced with a string or int
   path = '%s-%s-%s-%s.png'%(crop,kind,yname[0],nbins)
@@ -288,6 +289,21 @@ def plot_prices():
     means[k]=d.mean(axis=0)
   p=pd.concat(means,axis=1)
   p.plot()
+
+# http://stackoverflow.com/questions/4700614/how-to-put-the-legend-out-of-the-plot
+def put_legend_below(ax, ncol):
+  # Shrink current axis's height by 10% on the bottom
+  box = ax.get_position()
+  ax.set_position([box.x0, box.y0 + box.height * 0.1,
+                   box.width, box.height * 0.9])
+  
+  # Put a legend below current axis
+  lg= ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.05),
+                fancybox=True, shadow=False, ncol=ncol)
+  return lg
+
+
+## Tables
 
 def _make_table_desc(dataframes, nlr, price, pricetitle):
   # import reg
